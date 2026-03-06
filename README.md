@@ -48,7 +48,7 @@ Portfolio/
 │   └── Footer.tsx
 ├── public/
 ├── tailwind.config.ts
-├── next.config.ts
+├── next.config.mjs
 └── package.json
 ```
 
