@@ -1,189 +1,384 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { FiChevronDown } from 'react-icons/fi'
 
-const panelStyle = (visible: boolean): React.CSSProperties => ({
-  opacity: visible ? 1 : 0,
-  transform: visible ? 'translateY(0)' : 'translateY(24px)',
-  transition: 'opacity 0.7s ease, transform 0.7s ease',
-})
-
 export default function HeroScroll() {
-  const [loadingDone, setLoadingDone] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   const [scrollProgress, setScrollProgress] = useState(0)
-  const [hasScrolled, setHasScrolled] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // Loading screen: fade out after 1.8s
   useEffect(() => {
-    const timer = setTimeout(() => setLoadingDone(true), 1800)
+    const timer = setTimeout(() => setLoaded(true), 1800)
     return () => clearTimeout(timer)
   }, [])
 
+  // Scroll progress + navbar hide/show
   useEffect(() => {
     const handleScroll = () => {
-      if (!containerRef.current) return
-      const rect = containerRef.current.getBoundingClientRect()
-      const scrollable = rect.height - window.innerHeight
-      const progress = Math.min(Math.max(-rect.top / scrollable, 0), 1)
+      const el = containerRef.current
+      if (!el) return
+      const { top, height } = el.getBoundingClientRect()
+      const progress = Math.min(Math.max(-top / (height - window.innerHeight), 0), 1)
       setScrollProgress(progress)
-      if (window.scrollY > 10) setHasScrolled(true)
+
+      // Hide navbar while inside scroll section, show when past it
+      const nav = document.querySelector('nav') as HTMLElement | null
+      if (nav) {
+        if (progress < 0.95) {
+          nav.style.opacity = '0'
+          nav.style.pointerEvents = 'none'
+        } else {
+          nav.style.opacity = '1'
+          nav.style.pointerEvents = 'auto'
+        }
+      }
     }
     window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
+    // Reset navbar on unmount
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+      const nav = document.querySelector('nav') as HTMLElement | null
+      if (nav) {
+        nav.style.opacity = '1'
+        nav.style.pointerEvents = 'auto'
+      }
+    }
   }, [])
 
   const sp = scrollProgress
 
+  // --- Cinematic camera push-in ---
+  const scale = 1 + sp * 1.8
+  const yShift = sp * -35
+
+  // --- Text phase opacities (never overlap) ---
+  const p1 =
+    sp < 0.22
+      ? Math.min(sp / 0.08, 1)
+      : Math.max(1 - (sp - 0.22) / 0.05, 0)
+
+  const p2 =
+    sp < 0.25 ? 0
+    : sp < 0.35 ? (sp - 0.25) / 0.10
+    : sp < 0.45 ? 1
+    : Math.max(1 - (sp - 0.45) / 0.05, 0)
+
+  const p3 =
+    sp < 0.50 ? 0
+    : sp < 0.60 ? (sp - 0.50) / 0.10
+    : sp < 0.70 ? 1
+    : Math.max(1 - (sp - 0.70) / 0.05, 0)
+
+  const p4 =
+    sp < 0.75 ? 0
+    : Math.min((sp - 0.75) / 0.10, 1)
+
+  const phaseBase: React.CSSProperties = {
+    pointerEvents: 'none',
+    position: 'fixed',
+    inset: 0,
+    zIndex: 10,
+    display: 'flex',
+    transition: 'opacity 0.15s ease',
+  }
+
   return (
     <>
-      <AnimatePresence>
-        {!loadingDone && (
-          <motion.div
-            key="loading"
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.6 }}
-            className="fixed inset-0 bg-[#0a0a0a] z-[100] flex flex-col items-center justify-center"
-          >
-            <motion.svg
-              viewBox="0 0 100 100"
-              width="96"
-              height="96"
-              fill="none"
-              initial={{ opacity: 0, scale: 0.85 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, ease: 'easeOut' }}
-            >
-              <path
-                d="M 15 85 L 50 15 L 85 85"
-                stroke="white"
-                strokeWidth={4}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-                strokeOpacity={0.9}
-              />
-              <path
-                d="M 30 62 L 70 62"
-                stroke="white"
-                strokeWidth={4}
-                strokeLinecap="round"
-                strokeOpacity={0.9}
-              />
-            </motion.svg>
-            <motion.p
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3, duration: 0.5 }}
-              className="text-zinc-400 text-xs font-mono tracking-[0.35em] uppercase mt-5"
-            >
-              Loading Experience
-            </motion.p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* ── Loading Screen ── */}
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 200,
+          background: '#0a0a0a',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: loaded ? 0 : 1,
+          pointerEvents: loaded ? 'none' : 'auto',
+          transition: 'opacity 0.6s ease',
+        }}
+      >
+        <span
+          style={{
+            fontFamily: 'JetBrains Mono, Fira Code, monospace',
+            fontSize: '3.5rem',
+            fontWeight: 700,
+            letterSpacing: '0.05em',
+            color: '#C9A96E',
+            userSelect: 'none',
+          }}
+        >
+          {'<G/>'}
+        </span>
+        <p
+          style={{
+            marginTop: '1.25rem',
+            color: '#8A8F9E',
+            fontSize: '0.7rem',
+            fontFamily: 'JetBrains Mono, Fira Code, monospace',
+            letterSpacing: '0.3em',
+            textTransform: 'uppercase',
+          }}
+        >
+          Loading Experience
+        </p>
+      </div>
 
-      <section style={{ height: '500vh' }}>
-        <div ref={containerRef} style={{ height: '500vh', position: 'relative' }}>
-          <div className="sticky top-0 w-full h-screen overflow-hidden">
-            <div
-              className="absolute inset-0 z-0"
+      {/* ── 500vh Scroll Section ── */}
+      <div ref={containerRef} style={{ height: '500vh', position: 'relative' }}>
+        {/* Sticky viewport */}
+        <div
+          style={{
+            position: 'sticky',
+            top: 0,
+            width: '100%',
+            height: '100vh',
+            overflow: 'hidden',
+          }}
+        >
+          {/* ── Background image with cinematic zoom ── */}
+          <div style={{ position: 'absolute', inset: 0, zIndex: 0, overflow: 'hidden' }}>
+            <img
+              src="/hero.png"
+              alt=""
               style={{
-                transform: `scale(${1 + sp * 0.25})`,
-                transition: 'transform 0.1s linear',
-                transformOrigin: 'center center',
+                transform: `scale(${scale}) translateY(${yShift}%)`,
+                transformOrigin: 'center top',
+                objectFit: 'cover',
+                objectPosition: 'center top',
+                transition: 'transform 0.05s linear',
+                width: '100%',
+                height: '100%',
+                position: 'absolute',
+                inset: 0,
+                opacity: 0.8,
               }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/hero.png"
-                alt="Hero background"
+            />
+            {/* Dark overlay */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'rgba(0,0,0,0.38)',
+                zIndex: 1,
+              }}
+            />
+          </div>
+
+          {/* ── Phase 1 — "Your Name." centered ── */}
+          <div
+            style={{
+              ...phaseBase,
+              opacity: p1,
+              transform: `translateY(${(1 - p1) * 40}px)`,
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              padding: '0 1.5rem',
+            }}
+          >
+            <div>
+              <h1
                 style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  opacity: 0.78,
+                  fontSize: 'clamp(2.8rem, 8vw, 6rem)',
+                  fontWeight: 800,
+                  color: '#fff',
+                  letterSpacing: '-0.02em',
+                  lineHeight: 1.05,
+                  textShadow: '0 4px 32px rgba(0,0,0,0.7)',
+                }}
+              >
+                Your Name.
+              </h1>
+              <p
+                style={{
+                  marginTop: '1rem',
+                  color: '#d4d4d8',
+                  fontSize: 'clamp(0.85rem, 2vw, 1.15rem)',
+                  fontFamily: 'JetBrains Mono, Fira Code, monospace',
+                  letterSpacing: '0.2em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Full Stack Web Developer
+              </p>
+            </div>
+          </div>
+
+          {/* ── Phase 2 — Left aligned ── */}
+          <div
+            style={{
+              ...phaseBase,
+              opacity: p2,
+              transform: `translateY(${(1 - p2) * 40}px)`,
+              alignItems: 'center',
+              justifyContent: 'flex-start',
+              padding: '0 clamp(2rem, 8vw, 6rem)',
+            }}
+          >
+            <div>
+              <h2
+                style={{
+                  fontSize: 'clamp(2rem, 6vw, 4.5rem)',
+                  fontWeight: 800,
+                  color: '#fff',
+                  letterSpacing: '-0.02em',
+                  lineHeight: 1.1,
+                  textShadow: '0 4px 32px rgba(0,0,0,0.7)',
+                  maxWidth: '700px',
+                }}
+              >
+                I build digital experiences.
+              </h2>
+              <p
+                style={{
+                  marginTop: '1rem',
+                  color: '#d4d4d8',
+                  fontSize: 'clamp(0.85rem, 2vw, 1.1rem)',
+                  maxWidth: '500px',
+                }}
+              >
+                From responsive UIs to scalable full-stack applications.
+              </p>
+            </div>
+          </div>
+
+          {/* ── Phase 3 — Right aligned ── */}
+          <div
+            style={{
+              ...phaseBase,
+              opacity: p3,
+              transform: `translateY(${(1 - p3) * 40}px)`,
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              padding: '0 clamp(2rem, 8vw, 6rem)',
+            }}
+          >
+            <div style={{ textAlign: 'right' }}>
+              <h2
+                style={{
+                  fontSize: 'clamp(2rem, 6vw, 4.5rem)',
+                  fontWeight: 800,
+                  color: '#fff',
+                  letterSpacing: '-0.02em',
+                  lineHeight: 1.1,
+                  textShadow: '0 4px 32px rgba(0,0,0,0.7)',
+                  maxWidth: '700px',
+                }}
+              >
+                Bridging design and code.
+              </h2>
+              <p
+                style={{
+                  marginTop: '1rem',
+                  color: '#d4d4d8',
+                  fontSize: 'clamp(0.85rem, 2vw, 1.1rem)',
+                  fontFamily: 'JetBrains Mono, Fira Code, monospace',
+                }}
+              >
+                React • Next.js • TypeScript • Node.js
+              </p>
+            </div>
+          </div>
+
+          {/* ── Phase 4 — "See my work" centered ── */}
+          <div
+            style={{
+              ...phaseBase,
+              opacity: p4,
+              transform: `translateY(${(1 - p4) * 40}px)`,
+              alignItems: 'flex-end',
+              justifyContent: 'center',
+              paddingBottom: '6rem',
+              textAlign: 'center',
+            }}
+          >
+            <div>
+              <h2
+                style={{
+                  fontSize: 'clamp(2rem, 5vw, 3.5rem)',
+                  fontWeight: 800,
+                  color: '#fff',
+                  textShadow: '0 4px 32px rgba(0,0,0,0.7)',
+                }}
+              >
+                See my work
+              </h2>
+              <FiChevronDown
+                size={40}
+                style={{
+                  color: '#d4d4d8',
+                  margin: '1rem auto 0',
                   display: 'block',
+                  animation: 'bounce 1.2s infinite',
                 }}
               />
-              <div className="absolute inset-0 bg-black/45 z-10" />
             </div>
+          </div>
 
-            <div
-              className="absolute inset-0 z-10 flex pointer-events-none justify-center items-center text-center px-6"
-              style={panelStyle(sp >= 0 && sp < 0.22)}
+          {/* ── Scroll indicator (disappears after scrolling starts) ── */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '2rem',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '0.5rem',
+              zIndex: 20,
+              pointerEvents: 'none',
+              opacity: sp > 0.02 ? 0 : 1,
+              transition: 'opacity 0.4s ease',
+            }}
+          >
+            <span
+              style={{
+                color: '#a1a1aa',
+                fontSize: '0.65rem',
+                letterSpacing: '0.3em',
+                textTransform: 'uppercase',
+                fontFamily: 'JetBrains Mono, Fira Code, monospace',
+              }}
             >
-              <div>
-                <h1 className="text-5xl sm:text-7xl lg:text-8xl font-bold text-white tracking-tight drop-shadow-lg">
-                  Your Name.
-                </h1>
-                <p className="text-zinc-300 text-base sm:text-xl mt-4 font-mono tracking-widest">
-                  Full Stack Web Developer
-                </p>
-              </div>
-            </div>
-
+              SCROLL
+            </span>
             <div
-              className="absolute inset-0 z-10 flex pointer-events-none justify-center items-center px-8 sm:px-20"
-              style={panelStyle(sp >= 0.25 && sp < 0.45)}
+              style={{
+                width: '1.25rem',
+                height: '2rem',
+                border: '1px solid #52525b',
+                borderRadius: '9999px',
+                display: 'flex',
+                justifyContent: 'center',
+                paddingTop: '0.375rem',
+              }}
             >
-              <div>
-                <h2 className="text-4xl sm:text-6xl font-bold text-white drop-shadow-lg">
-                  I build digital experiences.
-                </h2>
-                <p className="text-zinc-300 text-base sm:text-lg mt-4 max-w-xl">
-                  From responsive UIs to scalable full-stack applications.
-                </p>
-              </div>
-            </div>
-
-            <div
-              className="absolute inset-0 z-10 flex pointer-events-none justify-end items-center px-8 sm:px-20"
-              style={panelStyle(sp >= 0.50 && sp < 0.68)}
-            >
-              <div className="text-right">
-                <h2 className="text-4xl sm:text-6xl font-bold text-white drop-shadow-lg">
-                  Bridging design and code.
-                </h2>
-                <p className="text-zinc-300 text-base sm:text-lg mt-4 font-mono">
-                  React • Next.js • TypeScript • Node.js
-                </p>
-              </div>
-            </div>
-
-            <div
-              className="absolute inset-0 z-10 flex pointer-events-none justify-center items-end pb-24 text-center"
-              style={panelStyle(sp >= 0.75 && sp < 0.92)}
-            >
-              <div>
-                <h2 className="text-4xl sm:text-5xl font-bold text-white drop-shadow-lg">
-                  See my work
-                </h2>
-                <FiChevronDown
-                  size={40}
-                  className="text-zinc-300 animate-bounce mx-auto mt-4"
-                />
-              </div>
-            </div>
-
-            <div
-              className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-20 pointer-events-none"
-              style={{ opacity: hasScrolled ? 0 : 1, transition: 'opacity 0.5s ease' }}
-            >
-              <span className="text-zinc-400 text-xs uppercase tracking-[0.3em]">SCROLL</span>
-              <motion.div
-                animate={{ y: [0, 8, 0] }}
-                transition={{ repeat: Infinity, duration: 1.5 }}
-                className="w-5 h-8 border border-zinc-500 rounded-full flex justify-center pt-1.5"
-              >
-                <div className="w-1 h-1.5 bg-zinc-400 rounded-full" />
-              </motion.div>
+              <div
+                style={{
+                  width: '0.25rem',
+                  height: '0.375rem',
+                  background: '#a1a1aa',
+                  borderRadius: '9999px',
+                }}
+              />
             </div>
           </div>
         </div>
-      </section>
+      </div>
+
+      {/* bounce keyframes */}
+      <style>{`{
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(10px); }
+        }
+      `}</style>
     </>
   )
 }
