@@ -16,15 +16,11 @@ export default function HeroScroll() {
   const [hasScrolled, setHasScrolled] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Loading screen: fade out after 1800ms
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoadingDone(true)
-    }, 1800)
+    const timer = setTimeout(() => setLoadingDone(true), 1800)
     return () => clearTimeout(timer)
   }, [])
 
-  // Scroll progress tracking
   useEffect(() => {
     const handleScroll = () => {
       if (!containerRef.current) return
@@ -32,9 +28,7 @@ export default function HeroScroll() {
       const scrollable = rect.height - window.innerHeight
       const progress = Math.min(Math.max(-rect.top / scrollable, 0), 1)
       setScrollProgress(progress)
-      if (window.scrollY > 10) {
-        setHasScrolled(true)
-      }
+      if (window.scrollY > 10) setHasScrolled(true)
     }
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
@@ -44,7 +38,6 @@ export default function HeroScroll() {
 
   return (
     <>
-      {/* Loading Screen */}
       <AnimatePresence>
         {!loadingDone && (
           <motion.div
@@ -92,12 +85,9 @@ export default function HeroScroll() {
         )}
       </AnimatePresence>
 
-      {/* 500vh Scroll Section — height on BOTH section and inner div */}
       <section style={{ height: '500vh' }}>
-        <div ref={containerRef} style={{ height: '500vh' }} className="relative">
-          {/* Sticky viewport */}
+        <div ref={containerRef} style={{ height: '500vh', position: 'relative' }}>
           <div className="sticky top-0 w-full h-screen overflow-hidden">
-            {/* Background image layer — using plain img so it works regardless of next/image config */}
             <div
               className="absolute inset-0 z-0"
               style={{
@@ -110,14 +100,17 @@ export default function HeroScroll() {
               <img
                 src="/hero.png"
                 alt="Hero background"
-                className="w-full h-full object-cover"
-                style={{ opacity: 0.78 }}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  opacity: 0.78,
+                  display: 'block',
+                }}
               />
-              {/* Dark overlay */}
-              <div className="absolute inset-0 bg-black/45" />
+              <div className="absolute inset-0 bg-black/45 z-10" />
             </div>
 
-            {/* Phase 1 — Your Name */}
             <div
               className="absolute inset-0 z-10 flex pointer-events-none justify-center items-center text-center px-6"
               style={panelStyle(sp >= 0 && sp < 0.22)}
@@ -132,7 +125,6 @@ export default function HeroScroll() {
               </div>
             </div>
 
-            {/* Phase 2 — I build digital experiences */}
             <div
               className="absolute inset-0 z-10 flex pointer-events-none justify-center items-center px-8 sm:px-20"
               style={panelStyle(sp >= 0.25 && sp < 0.45)}
@@ -147,7 +139,6 @@ export default function HeroScroll() {
               </div>
             </div>
 
-            {/* Phase 3 — Bridging design and code */}
             <div
               className="absolute inset-0 z-10 flex pointer-events-none justify-end items-center px-8 sm:px-20"
               style={panelStyle(sp >= 0.50 && sp < 0.68)}
@@ -162,7 +153,6 @@ export default function HeroScroll() {
               </div>
             </div>
 
-            {/* Phase 4 — See my work */}
             <div
               className="absolute inset-0 z-10 flex pointer-events-none justify-center items-end pb-24 text-center"
               style={panelStyle(sp >= 0.75 && sp < 0.92)}
@@ -178,13 +168,9 @@ export default function HeroScroll() {
               </div>
             </div>
 
-            {/* Scroll indicator */}
             <div
               className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-20 pointer-events-none"
-              style={{
-                opacity: hasScrolled ? 0 : 1,
-                transition: 'opacity 0.5s ease',
-              }}
+              style={{ opacity: hasScrolled ? 0 : 1, transition: 'opacity 0.5s ease' }}
             >
               <span className="text-zinc-400 text-xs uppercase tracking-[0.3em]">SCROLL</span>
               <motion.div
