@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiChevronDown } from 'react-icons/fi'
-import Image from 'next/image'
 
 const panelStyle = (visible: boolean): React.CSSProperties => ({
   opacity: visible ? 1 : 0,
@@ -15,7 +14,6 @@ export default function HeroScroll() {
   const [loadingDone, setLoadingDone] = useState(false)
   const [scrollProgress, setScrollProgress] = useState(0)
   const [hasScrolled, setHasScrolled] = useState(false)
-  const [imgError, setImgError] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Loading screen: fade out after 1800ms
@@ -56,7 +54,6 @@ export default function HeroScroll() {
             transition={{ duration: 0.6 }}
             className="fixed inset-0 bg-[#0a0a0a] z-[100] flex flex-col items-center justify-center"
           >
-            {/* Logo SVG — bright white strokes for visibility */}
             <motion.svg
               viewBox="0 0 100 100"
               width="96"
@@ -66,7 +63,6 @@ export default function HeroScroll() {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, ease: 'easeOut' }}
             >
-              {/* Outer A shape */}
               <path
                 d="M 15 85 L 50 15 L 85 85"
                 stroke="white"
@@ -76,7 +72,6 @@ export default function HeroScroll() {
                 fill="none"
                 strokeOpacity={0.9}
               />
-              {/* Crossbar */}
               <path
                 d="M 30 62 L 70 62"
                 stroke="white"
@@ -97,12 +92,12 @@ export default function HeroScroll() {
         )}
       </AnimatePresence>
 
-      {/* 500vh Scroll Section */}
-      <section>
-        <div ref={containerRef} className="relative h-[500vh]">
+      {/* 500vh Scroll Section — height on BOTH section and inner div */}
+      <section style={{ height: '500vh' }}>
+        <div ref={containerRef} style={{ height: '500vh' }} className="relative">
           {/* Sticky viewport */}
           <div className="sticky top-0 w-full h-screen overflow-hidden">
-            {/* Background image layer */}
+            {/* Background image layer — using plain img so it works regardless of next/image config */}
             <div
               className="absolute inset-0 z-0"
               style={{
@@ -111,22 +106,15 @@ export default function HeroScroll() {
                 transformOrigin: 'center center',
               }}
             >
-              {!imgError ? (
-                <Image
-                  src="/hero.png"
-                  alt="Hero background"
-                  fill
-                  priority
-                  className="object-cover"
-                  style={{ opacity: 0.78 }}
-                  onError={() => setImgError(true)}
-                />
-              ) : (
-                /* Fallback gradient if image missing */
-                <div className="w-full h-full bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-950" />
-              )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/hero.png"
+                alt="Hero background"
+                className="w-full h-full object-cover"
+                style={{ opacity: 0.78 }}
+              />
               {/* Dark overlay */}
-              <div className="absolute inset-0 bg-black/45 z-10" />
+              <div className="absolute inset-0 bg-black/45" />
             </div>
 
             {/* Phase 1 — Your Name */}
