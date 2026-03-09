@@ -7,6 +7,7 @@ export default function HeroScroll() {
   const [loaded, setLoaded] = useState(false)
   const [scrollProgress, setScrollProgress] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   // Loading screen: fade out after 1.8s
   useEffect(() => {
@@ -14,7 +15,7 @@ export default function HeroScroll() {
     return () => clearTimeout(timer)
   }, [])
 
-  // Scroll progress + navbar hide/show
+  // Scroll progress + video scrubbing + navbar hide/show
   useEffect(() => {
     const handleScroll = () => {
       const el = containerRef.current
@@ -22,6 +23,12 @@ export default function HeroScroll() {
       const { top, height } = el.getBoundingClientRect()
       const progress = Math.min(Math.max(-top / (height - window.innerHeight), 0), 1)
       setScrollProgress(progress)
+
+      // Video frame scrubbing
+      const video = videoRef.current
+      if (video && video.duration) {
+        video.currentTime = progress * video.duration
+      }
 
       // Hide navbar while inside scroll section, show when past it
       const nav = document.querySelector('nav') as HTMLElement | null
@@ -48,10 +55,6 @@ export default function HeroScroll() {
   }, [])
 
   const sp = scrollProgress
-
-  // --- Cinematic camera push-in ---
-  const scale = 1 + sp * 1.8
-  const yShift = sp * -35
 
   // --- Text phase opacities (never overlap) ---
   const p1 =
@@ -140,22 +143,25 @@ export default function HeroScroll() {
             overflow: 'hidden',
           }}
         >
-          {/* ── Background image with cinematic zoom ── */}
+          {/* ── Background video with cinematic zoom + scroll scrubbing ── */}
           <div style={{ position: 'absolute', inset: 0, zIndex: 0, overflow: 'hidden' }}>
-            <img
-              src="/hero.png"
-              alt=""
+            <video
+              ref={videoRef}
+              src="/hero-scroll.mp4"
+              muted
+              playsInline
+              preload="auto"
               style={{
-                transform: `scale(${scale}) translateY(${yShift}%)`,
-                transformOrigin: 'center top',
-                objectFit: 'cover',
-                objectPosition: 'center top',
-                transition: 'transform 0.05s linear',
-                width: '100%',
-                height: '100%',
                 position: 'absolute',
                 inset: 0,
-                opacity: 0.8,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'center top',
+                opacity: 0.85,
+                transform: `scale(${1 + scrollProgress * 1.4}) translateY(${scrollProgress * -12}%)`,
+                transformOrigin: 'center top',
+                transition: 'transform 0.05s linear',
               }}
             />
             {/* Dark overlay */}
@@ -373,7 +379,7 @@ export default function HeroScroll() {
       </div>
 
       {/* bounce keyframes */}
-      <style>{`{
+      <style>{`
         @keyframes bounce {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(10px); }
