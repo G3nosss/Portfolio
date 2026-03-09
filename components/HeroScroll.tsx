@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { FiChevronDown } from 'react-icons/fi'
 
+const TOTAL_FRAMES = 151
+
 export default function HeroScroll() {
   const [loaded, setLoaded] = useState(false)
   const [scrollProgress, setScrollProgress] = useState(0)
+  const [currentFrame, setCurrentFrame] = useState('/frames/ezgif-frame-001.jpg')
   const containerRef = useRef<HTMLDivElement>(null)
-  const videoRef = useRef<HTMLVideoElement>(null)
 
   // Loading screen: fade out after 1.8s
   useEffect(() => {
@@ -15,7 +17,15 @@ export default function HeroScroll() {
     return () => clearTimeout(timer)
   }, [])
 
-  // Scroll progress + video scrubbing + navbar hide/show
+  // Preload ALL 151 frames on mount for smooth scrubbing
+  useEffect(() => {
+    for (let i = 1; i <= TOTAL_FRAMES; i++) {
+      const img = new Image()
+      img.src = `/frames/ezgif-frame-${String(i).padStart(3, '0')}.jpg`
+    }
+  }, [])
+
+  // Scroll progress + frame scrubbing + navbar hide/show
   useEffect(() => {
     const handleScroll = () => {
       const el = containerRef.current
@@ -24,11 +34,14 @@ export default function HeroScroll() {
       const progress = Math.min(Math.max(-top / (height - window.innerHeight), 0), 1)
       setScrollProgress(progress)
 
-      // Video frame scrubbing
-      const video = videoRef.current
-      if (video && video.duration) {
-        video.currentTime = progress * video.duration
-      }
+      // Image frame scrubbing
+      const frameIndex = Math.min(
+        Math.floor(progress * (TOTAL_FRAMES - 1)) + 1,
+        TOTAL_FRAMES
+      )
+      setCurrentFrame(
+        `/frames/ezgif-frame-${String(frameIndex).padStart(3, '0')}.jpg`
+      )
 
       // Hide navbar while inside scroll section, show when past it
       const nav = document.querySelector('nav') as HTMLElement | null
@@ -143,14 +156,11 @@ export default function HeroScroll() {
             overflow: 'hidden',
           }}
         >
-          {/* ── Background video with cinematic zoom + scroll scrubbing ── */}
+          {/* ── Background: frame scrubbing with cinematic zoom ── */}
           <div style={{ position: 'absolute', inset: 0, zIndex: 0, overflow: 'hidden' }}>
-            <video
-              ref={videoRef}
-              src="/hero-scroll.mp4"
-              muted
-              playsInline
-              preload="auto"
+            <img
+              src={currentFrame}
+              alt="hero"
               style={{
                 position: 'absolute',
                 inset: 0,
@@ -159,7 +169,7 @@ export default function HeroScroll() {
                 objectFit: 'cover',
                 objectPosition: 'center top',
                 opacity: 0.85,
-                transform: `scale(${1 + scrollProgress * 1.4}) translateY(${scrollProgress * -12}%)`,
+                transform: `scale(${1 + sp * 1.4}) translateY(${sp * -12}%)`,
                 transformOrigin: 'center top',
                 transition: 'transform 0.05s linear',
               }}
@@ -291,7 +301,7 @@ export default function HeroScroll() {
             </div>
           </div>
 
-          {/* ── Phase 4 — "See my work" centered ── */}
+          {/* ── Phase 4 — "See my work" centered bottom ── */}
           <div
             style={{
               ...phaseBase,
@@ -379,12 +389,7 @@ export default function HeroScroll() {
       </div>
 
       {/* bounce keyframes */}
-      <style>{`
-        @keyframes bounce {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(10px); }
-        }
-      `}</style>
+      <style>{`\n        @keyframes bounce {\n          0%, 100% { transform: translateY(0); }\n          50% { transform: translateY(10px); }\n        }\n      `}</style>
     </>
   )
 }
