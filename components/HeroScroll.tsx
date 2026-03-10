@@ -4,61 +4,139 @@ import { useEffect, useRef, useState } from 'react'
 import { FiChevronDown } from 'react-icons/fi'
 
 const TOTAL_FRAMES = 151
+const SCROLL_HEIGHT = '900vh'
+
+function getFrameSrc(index: number) {
+  return `/frames/ezgif-frame-${String(index).padStart(3, '0')}.jpg`
+}
 
 export default function HeroScroll() {
   const [loaded, setLoaded] = useState(false)
-  const [scrollProgress, setScrollProgress] = useState(0)
-  const [currentFrame, setCurrentFrame] = useState('/frames/ezgif-frame-001.jpg')
   const containerRef = useRef<HTMLDivElement>(null)
+  const imgRef = useRef<HTMLImageElement>(null)
 
-  // Loading screen: fade out after 1.8s
+  // Refs for RAF-based smooth scrubbing (no React re-render on every frame)
+  const rawProgressRef = useRef(0)
+  const smoothProgressRef = useRef(0)
+  const spRef = useRef(0)
+  const rafRef = useRef<number | null>(null)
+
+  // Text phase div refs — updated directly in RAF loop
+  const phase1Ref = useRef<HTMLDivElement>(null)
+  const phase2Ref = useRef<HTMLDivElement>(null)
+  const phase3Ref = useRef<HTMLDivElement>(null)
+  const phase4Ref = useRef<HTMLDivElement>(null)
+
+  // Navbar ref
+  const navHiddenRef = useRef(false)
+
+  // Loading screen
   useEffect(() => {
     const timer = setTimeout(() => setLoaded(true), 1800)
     return () => clearTimeout(timer)
   }, [])
 
-  // Preload ALL 151 frames on mount for smooth scrubbing
+  // Preload all frames
   useEffect(() => {
     for (let i = 1; i <= TOTAL_FRAMES; i++) {
-      const img = new Image()
-      img.src = `/frames/ezgif-frame-${String(i).padStart(3, '0')}.jpg`
+      const img = new window.Image()
+      img.src = getFrameSrc(i)
     }
   }, [])
 
-  // Scroll progress + frame scrubbing + navbar hide/show
+  // Scroll listener + RAF smooth loop
   useEffect(() => {
     const handleScroll = () => {
       const el = containerRef.current
       if (!el) return
       const { top, height } = el.getBoundingClientRect()
-      const progress = Math.min(Math.max(-top / (height - window.innerHeight), 0), 1)
-      setScrollProgress(progress)
+      rawProgressRef.current = Math.min(
+        Math.max(-top / (height - window.innerHeight), 0),
+        1
+      )
+    }
 
-      // Image frame scrubbing
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+
+    const tick = () => {
+      // Smooth interpolation — increase 0.12 for faster catch-up, decrease for more lag
+      smoothProgressRef.current = lerp(
+        smoothProgressRef.current,
+        rawProgressRef.current,
+        0.12
+      )
+      const sp = smoothProgressRef.current
+      spRef.current = sp
+
+      // --- Update background frame directly on DOM node ---
       const frameIndex = Math.min(
-        Math.floor(progress * (TOTAL_FRAMES - 1)) + 1,
+        Math.floor(sp * (TOTAL_FRAMES - 1)) + 1,
         TOTAL_FRAMES
       )
-      setCurrentFrame(
-        `/frames/ezgif-frame-${String(frameIndex).padStart(3, '0')}.jpg`
-      )
-
-      // Hide navbar while inside scroll section, show when past it
-      const nav = document.querySelector('nav') as HTMLElement | null
-      if (nav) {
-        if (progress < 0.95) {
-          nav.style.opacity = '0'
-          nav.style.pointerEvents = 'none'
-        } else {
-          nav.style.opacity = '1'
-          nav.style.pointerEvents = 'auto'
+      const newSrc = getFrameSrc(frameIndex)
+      if (imgRef.current && imgRef.current.src !== newSrc) {
+        // Use absolute URL comparison
+        if (!imgRef.current.src.endsWith(newSrc)) {
+          imgRef.current.src = newSrc
         }
       }
+
+      // --- Navbar hide/show ---
+      const nav = document.querySelector('nav') as HTMLElement | null
+      if (nav) {
+        if (sp < 0.95 && !navHiddenRef.current) {
+          nav.style.opacity = '0'
+          nav.style.pointerEvents = 'none'
+          navHiddenRef.current = true
+        } else if (sp >= 0.95 && navHiddenRef.current) {
+          nav.style.opacity = '1'
+          nav.style.pointerEvents = 'auto'
+          navHiddenRef.current = false
+        }
+      }
+
+      // --- Phase opacities (smooth, non-overlapping) ---
+      const p1 =
+        sp < 0.18
+          ? Math.min(sp / 0.06, 1)
+          : Math.max(1 - (sp - 0.18) / 0.06, 0)
+
+      const p2 =
+        sp < 0.26 ? 0
+        : sp < 0.36 ? (sp - 0.26) / 0.10
+        : sp < 0.46 ? 1
+        : Math.max(1 - (sp - 0.46) / 0.06, 0)
+
+      const p3 =
+        sp < 0.52 ? 0
+        : sp < 0.62 ? (sp - 0.52) / 0.10
+        : sp < 0.72 ? 1
+        : Math.max(1 - (sp - 0.72) / 0.06, 0)
+
+      const p4 =
+        sp < 0.78 ? 0
+        : Math.min((sp - 0.78) / 0.10, 1)
+
+      const applyPhase = (el: HTMLDivElement | null, p: number) => {
+        if (!el) return
+        el.style.opacity = String(p)
+        el.style.transform = `translateY(${(1 - p) * 36}px)`
+      }
+
+      applyPhase(phase1Ref.current, p1)
+      applyPhase(phase2Ref.current, p2)
+      applyPhase(phase3Ref.current, p3)
+      applyPhase(phase4Ref.current, p4)
+
+      rafRef.current = requestAnimationFrame(tick)
     }
+
     window.addEventListener('scroll', handleScroll, { passive: true })
-    // Reset navbar on unmount
+    rafRef.current = requestAnimationFrame(tick)
+
     return () => {
       window.removeEventListener('scroll', handleScroll)
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
       const nav = document.querySelector('nav') as HTMLElement | null
       if (nav) {
         nav.style.opacity = '1'
@@ -67,37 +145,13 @@ export default function HeroScroll() {
     }
   }, [])
 
-  const sp = scrollProgress
-
-  // --- Text phase opacities (never overlap) ---
-  const p1 =
-    sp < 0.22
-      ? Math.min(sp / 0.08, 1)
-      : Math.max(1 - (sp - 0.22) / 0.05, 0)
-
-  const p2 =
-    sp < 0.25 ? 0
-    : sp < 0.35 ? (sp - 0.25) / 0.10
-    : sp < 0.45 ? 1
-    : Math.max(1 - (sp - 0.45) / 0.05, 0)
-
-  const p3 =
-    sp < 0.50 ? 0
-    : sp < 0.60 ? (sp - 0.50) / 0.10
-    : sp < 0.70 ? 1
-    : Math.max(1 - (sp - 0.70) / 0.05, 0)
-
-  const p4 =
-    sp < 0.75 ? 0
-    : Math.min((sp - 0.75) / 0.10, 1)
-
   const phaseBase: React.CSSProperties = {
     pointerEvents: 'none',
     position: 'fixed',
     inset: 0,
     zIndex: 10,
     display: 'flex',
-    transition: 'opacity 0.15s ease',
+    willChange: 'opacity, transform',
   }
 
   return (
@@ -144,8 +198,8 @@ export default function HeroScroll() {
         </p>
       </div>
 
-      {/* ── 500vh Scroll Section ── */}
-      <div ref={containerRef} style={{ height: '500vh', position: 'relative' }}>
+      {/* ── Scroll Section ── */}
+      <div ref={containerRef} style={{ height: SCROLL_HEIGHT, position: 'relative' }}>
         {/* Sticky viewport */}
         <div
           style={{
@@ -156,11 +210,13 @@ export default function HeroScroll() {
             overflow: 'hidden',
           }}
         >
-          {/* ── Background: frame scrubbing with cinematic zoom ── */}
+          {/* ── Background: frame scrubbing, NO zoom ── */}
           <div style={{ position: 'absolute', inset: 0, zIndex: 0, overflow: 'hidden' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={currentFrame}
-              alt="hero"
+              ref={imgRef}
+              src={getFrameSrc(1)}
+              alt="hero background"
               style={{
                 position: 'absolute',
                 inset: 0,
@@ -168,10 +224,8 @@ export default function HeroScroll() {
                 height: '100%',
                 objectFit: 'cover',
                 objectPosition: 'center top',
-                opacity: 0.85,
-                transform: `scale(${1 + sp * 1.4}) translateY(${sp * -12}%)`,
-                transformOrigin: 'center top',
-                transition: 'transform 0.05s linear',
+                opacity: 0.88,
+                willChange: 'contents',
               }}
             />
             {/* Dark overlay */}
@@ -187,10 +241,10 @@ export default function HeroScroll() {
 
           {/* ── Phase 1 — "Your Name." centered ── */}
           <div
+            ref={phase1Ref}
             style={{
               ...phaseBase,
-              opacity: p1,
-              transform: `translateY(${(1 - p1) * 40}px)`,
+              opacity: 0,
               alignItems: 'center',
               justifyContent: 'center',
               textAlign: 'center',
@@ -227,10 +281,10 @@ export default function HeroScroll() {
 
           {/* ── Phase 2 — Left aligned ── */}
           <div
+            ref={phase2Ref}
             style={{
               ...phaseBase,
-              opacity: p2,
-              transform: `translateY(${(1 - p2) * 40}px)`,
+              opacity: 0,
               alignItems: 'center',
               justifyContent: 'flex-start',
               padding: '0 clamp(2rem, 8vw, 6rem)',
@@ -265,10 +319,10 @@ export default function HeroScroll() {
 
           {/* ── Phase 3 — Right aligned ── */}
           <div
+            ref={phase3Ref}
             style={{
               ...phaseBase,
-              opacity: p3,
-              transform: `translateY(${(1 - p3) * 40}px)`,
+              opacity: 0,
               alignItems: 'center',
               justifyContent: 'flex-end',
               padding: '0 clamp(2rem, 8vw, 6rem)',
@@ -296,17 +350,17 @@ export default function HeroScroll() {
                   fontFamily: 'JetBrains Mono, Fira Code, monospace',
                 }}
               >
-                React • Next.js • TypeScript • Node.js
+                React · Next.js · TypeScript · Node.js
               </p>
             </div>
           </div>
 
-          {/* ── Phase 4 — "See my work" centered bottom ── */}
+          {/* ── Phase 4 — "See my work" bottom center ── */}
           <div
+            ref={phase4Ref}
             style={{
               ...phaseBase,
-              opacity: p4,
-              transform: `translateY(${(1 - p4) * 40}px)`,
+              opacity: 0,
               alignItems: 'flex-end',
               justifyContent: 'center',
               paddingBottom: '6rem',
@@ -316,7 +370,7 @@ export default function HeroScroll() {
             <div>
               <h2
                 style={{
-                  fontSize: 'clamp(2rem, 5vw, 3.5rem)',
+                  fontSize: 'clamp(1.8rem, 5vw, 3.5rem)',
                   fontWeight: 800,
                   color: '#fff',
                   textShadow: '0 4px 32px rgba(0,0,0,0.7)',
@@ -325,71 +379,25 @@ export default function HeroScroll() {
                 See my work
               </h2>
               <FiChevronDown
-                size={40}
+                size={36}
                 style={{
                   color: '#d4d4d8',
-                  margin: '1rem auto 0',
-                  display: 'block',
-                  animation: 'bounce 1.2s infinite',
+                  marginTop: '1rem',
+                  animation: 'bounce 1.5s infinite',
                 }}
               />
             </div>
           </div>
 
-          {/* ── Scroll indicator (disappears after scrolling starts) ── */}
-          <div
-            style={{
-              position: 'absolute',
-              bottom: '2rem',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '0.5rem',
-              zIndex: 20,
-              pointerEvents: 'none',
-              opacity: sp > 0.02 ? 0 : 1,
-              transition: 'opacity 0.4s ease',
-            }}
-          >
-            <span
-              style={{
-                color: '#a1a1aa',
-                fontSize: '0.65rem',
-                letterSpacing: '0.3em',
-                textTransform: 'uppercase',
-                fontFamily: 'JetBrains Mono, Fira Code, monospace',
-              }}
-            >
-              SCROLL
-            </span>
-            <div
-              style={{
-                width: '1.25rem',
-                height: '2rem',
-                border: '1px solid #52525b',
-                borderRadius: '9999px',
-                display: 'flex',
-                justifyContent: 'center',
-                paddingTop: '0.375rem',
-              }}
-            >
-              <div
-                style={{
-                  width: '0.25rem',
-                  height: '0.375rem',
-                  background: '#a1a1aa',
-                  borderRadius: '9999px',
-                }}
-              />
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* bounce keyframes */}
-      <style>{`\n        @keyframes bounce {\n          0%, 100% { transform: translateY(0); }\n          50% { transform: translateY(10px); }\n        }\n      `}</style>
+      <style>{`
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(10px); }
+        }
+      `}</style>
     </>
   )
 }
